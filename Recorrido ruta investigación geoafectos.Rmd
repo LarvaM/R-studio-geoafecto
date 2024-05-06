@@ -1,0 +1,219 @@
+---
+title: "algoritmo genético"
+output: html_document
+date: "2024-04-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#install.packages("leaflet")
+library(leaflet)
+```
+```{r}
+cities <- data.frame(
+  city = c("Rio Yuspe", "Las Tapias", "Casa Bamba", "Dumesnil", "Pan de azúcar"),
+  Latitude = c(	31.1229, 31.5736, 31.2112, 31.2000, 31.1418),
+  Longitude = c(64.2906, 65.0539, 64.2343, 64.2000, 64.2512)
+
+)
+```
+
+```{r}
+distances_matrix <- matrix(0, nrow = nrow(cities), ncol = nrow(cities))
+for (i in 1:nrow(cities) - 1) {
+  for (j in (i + 1):nrow(cities)) {
+    distance <- sqrt((cities[i, "Latitude"] - cities[j, "Latitude"])^2 + (cities[i, "Longitude"] - cities[j, "Longitude"])^2)
+    distances_matrix[i, j] <- distance
+    distances_matrix[j, i] <- distance
+  }
+  
+}
+
+```
+
+```{r}
+calculate_distance <- function(individual, distances_matrix){
+  distance <- 0
+  for (i in 1:(length(individual) - 1)) {
+    distance <- distance + distances_matrix[individual[i], individual[i + 1]]
+  }
+  distance <- distance + distances_matrix[individual[length(individual)], individual[1]]
+  return(distance)
+}
+```
+
+```{r}
+calculate_fitness <- function(population, distances_matrix){
+  fitness <- numeric(length(population))
+  for (i in seq_along(population)){
+    individual <- population[[i]]
+    if (length(individual) > 0 && all(distances_matrix[individual[-length(individual)], individual[-1]] > 0)) {
+      fitness[i] <- 1 / calculate_distance(individual, distances_matrix)
+
+    }else {
+  fitness[i] <- 0
+}
+
+  }
+  return(fitness)
+}
+```
+
+```{r}
+crossover <- function(parent1, parent2){
+  crossover_point <- sample(2:(length(parent1) - 1), 1)
+  child <- numeric(length(parent1))
+  child[1:crossover_point] <- parent1[1:crossover_point]
+  for (i in (crossover_point + 1):length(parent2)){
+    if (!(parent2[i] %in% child)){
+      child[i] <- parent2[i]
+    }
+  }
+}
+
+map_best_route <- plot_route(best_route_indices, cities)
+map_best_route
+
+
+```
+```{r}
+
+```
+
+```{r}
+map_best_route <- plot_route(best_route, cities)
+map_best_route
+```
+```{r}
+#install.packages("GA")
+#install.packages("geosphere")
+library("GA")
+library("geosphere")
+```
+
+```{r}
+cities <- data.frame(
+  city = c("Córdoba capital", "Rio Yuspe", "Las Tapias", "Casa Bamba", "Dumesnil", "Pan de azúcar"),
+  Latitude = c(31.24, 31.1229, 31.5736, 31.2112, 31.2000, 31.1418),
+  Longitude = c(64.11, 64.2906, 65.0539, 64.2343, 64.2000, 64.2512)
+
+)
+distances_matrix <- distm(cities[, c("Longitude", "Latitude")])
+```
+```{r}
+calculate_distance <- function(individual, distances_matrix){
+  sum(distances_matrix[individual, c(individual[-1], individual[1])])
+}
+```
+```{r}
+eval_func <- function(solution){
+  -calculate_distance(solution, distances_matrix)
+}
+```
+  for (i in 1:length(parent2)){
+    if (!(parent2[i] %in% child)){
+      child[i] <- parent2[i]
+    }
+  } # Se agregó un corchete de cierre aquí
+  return(child)
+}
+
+```
+
+```{r}
+mutate <- function(individual){
+  mutation_point1 <- sample(1:(length(individual) -1), 1)
+  mutation_point2 <- sample(1:(length(individual) -1), 1)
+  temp <- individual[mutation_point1] <- individual[mutation_point2]
+  individual[mutation_point2] <- temp
+  return(individual)
+}
+```
+
+```{r}
+execute_genetic_algorithm <- function(cities, distances_matrix, num_generations = 5){
+  population <- list()
+  for (i in 1:5) {
+    individual <- sample(1:nrow(cities))
+    while (calculate_distance(individual, distances_matrix) == 0) {
+      individual <- sample(1:nrow(cities))
+    }
+    population[[i]] <- individual
+  }
+  
+  for (generation in 1:num_generations) {
+    fitness <- calculate_fitness(population, distances_matrix)
+    selected_indices <- order(fitness, decreasing = TRUE)[1:2]
+    new_individual <- crossover(population[[selected_indices[1]]], population[[selected_indices[2]]])
+    mutated_individual <- mutate(new_individual)
+    population[[which.min(fitness)]] <- mutated_individual
+  }
+  
+  best_fitness <- -Inf
+  best_individual <- NULL
+  
+  for (i in 1:length(population)) {
+    current_fitness <- calculate_fitness(list(population[[i]]), distances_matrix)
+    if (current_fitness > best_fitness) {
+      best_fitness <- current_fitness
+      best_individual <- population[[i]]
+    }
+  }
+  
+  return(best_individual)
+}
+
+```
+
+```{r}
+#install.packages("magrittr")
+library(magrittr)
+
+```
+
+
+```{r}
+best_route_indices <- execute_genetic_algorithm(cities, distances_matrix)
+best_cities <- cities$city[best_route_indices]
+
+plot_route <- function(route_indices, cities){
+  route_cities <- cities[route_indices, "city"]
+  map <- leaflet() %>%
+    addTiles() %>%
+    addMarkers(data = cities, lng = ~Longitude, lat = ~Latitude, label = ~city) %>%
+    addPolylines(data = cities[route_indices,], lng = ~Longitude, lat = ~Latitude, color = "blue") %>%
+    addPopups(lng = cities[route_indices, "Longitude"], lat = cities[route_indices, "Latitude"], popup = route_cities)
+  return(map)
+```{r}
+ga_result <- ga(type = "permutation", fitness = eval_func, lower = 1, upper = nrow(cities), popSize = 50, maxiter = 100, run = 10)
+```
+```{r}
+best_solution <- ga_result@solution
+filtered_best_route <- unique(cities$city[best_solution])
+cat("Mejor recorrido encontrado:\n")
+cat(filtered_best_route, "\n")
+```
+
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
